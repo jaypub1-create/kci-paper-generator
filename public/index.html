@@ -2,8 +2,13 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>KCI Paper Generator</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
   <style>
     :root {
       --bg: #0f172a;
@@ -127,12 +132,56 @@
     .log-info { color: var(--accent-light); }
     .log-success { color: var(--success); }
     .log-error { color: var(--error); }
+    .login-screen {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 20px;
+    }
+    .login-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+      padding: 48px 40px; max-width: 360px; width: 100%;
+      box-shadow: 0 20px 25px rgba(0,0,0,0.3);
+    }
+    .login-icon {
+      width: 64px; height: 64px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-light), #a78bfa);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 24px; font-size: 32px;
+      box-shadow: 0 4px 12px rgba(99,102,241,0.3);
+    }
+    .login-title {
+      text-align: center; font-size: 24px; font-weight: 700;
+      background: linear-gradient(135deg, var(--accent-light), #a78bfa);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 12px;
+    }
+    .login-subtitle {
+      text-align: center; color: var(--text-dim); font-size: 14px; margin-bottom: 32px;
+    }
+    .login-form-group { margin-bottom: 20px; }
+    .login-form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--text-dim); margin-bottom: 6px; }
+    .login-form-group input {
+      width: 100%; padding: 12px 16px; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 10px;
+      color: var(--text); font-size: 15px; font-family: inherit; outline: none;
+    }
+    .login-form-group input:focus { border-color: var(--accent); }
+    .login-btn {
+      width: 100%; padding: 14px; border-radius: 12px; font-size: 16px; font-weight: 600;
+      background: linear-gradient(135deg, var(--accent), #7c3aed); color: white;
+      border: none; cursor: pointer; font-family: inherit;
+      box-shadow: 0 4px 12px rgba(99,102,241,0.3); transition: all 0.3s;
+    }
+    .login-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(99,102,241,0.4); }
+    .login-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .login-error { color: var(--error); margin-top: 12px; font-size: 14px; padding: 10px; background: rgba(239,68,68,0.1); border-radius: 8px; text-align: center; }
     @media (max-width: 640px) {
       .app { padding: 12px; } .card { padding: 20px; }
       .header h1 { font-size: 22px; }
       .form-row { flex-direction: column; gap: 0; }
       .result-stats { flex-direction: column; gap: 12px; }
       .btn-row { flex-direction: column; gap: 10px; }
+      .login-card { padding: 36px 24px; }
+      .login-title { font-size: 20px; }
     }
   </style>
 </head>
@@ -149,24 +198,97 @@
     var useRef = React.useRef;
 
     var METHODS = [
-      { id: "slr_meta", label: "SLR + \uBA54\uD0C0\uBD84\uC11D" },
-      { id: "empirical", label: "\uC2E4\uC99D\uC5F0\uAD6C" },
-      { id: "case", label: "\uC0AC\uB840\uC5F0\uAD6C" },
-      { id: "experiment", label: "\uC2E4\uD5D8\uC5F0\uAD6C" }
+      { id: "slr_meta", label: "SLR + 메타분석" },
+      { id: "empirical", label: "실증연구" },
+      { id: "case", label: "사례연구" },
+      { id: "experiment", label: "실험연구" }
     ];
 
     var STEPS = [
-      { id: "refs",       label: "\uCC38\uACE0\uBB38\uD5CC \uC218\uC9D1",   detail: "\uC6F9 \uAC80\uC0C9\uC73C\uB85C 30\uD3B8 \uC774\uC0C1 \uD559\uC220 \uBB38\uD5CC \uC218\uC9D1" },
-      { id: "design",     label: "\uC5F0\uAD6C \uC124\uACC4",       detail: "RQ, \uBCC0\uC218 \uCCB4\uACC4, \uAC00\uC124, \uC774\uB860\uC801 \uD504\uB808\uC784\uC6CC\uD06C" },
-      { id: "intro",      label: "I. \uC11C\uB860 \uC791\uC131",    detail: "\uC5F0\uAD6C \uBC30\uACBD, \uBAA9\uC801, \uAC00\uC124, \uBC94\uC704" },
-      { id: "theory",     label: "II. \uC774\uB860\uC801 \uBC30\uACBD", detail: "\uAC1C\uB150 \uC815\uC758, \uC774\uB860, \uC120\uD589\uC5F0\uAD6C" },
-      { id: "method",     label: "III. \uC5F0\uAD6C \uBC29\uBC95",  detail: "PRISMA, \uD488\uC9C8\uD3C9\uAC00, \uBD84\uC11D \uC808\uCC28" },
-      { id: "results",    label: "IV. \uC5F0\uAD6C \uACB0\uACFC",   detail: "\uAE30\uC220\uD1B5\uACC4, \uAC00\uC124\uAC80\uC99D, \uBBFC\uAC10\uB3C4\uBD84\uC11D" },
-      { id: "conclusion", label: "V. \uACB0\uB860",         detail: "\uC694\uC57D, \uC2DC\uC0AC\uC810, \uD55C\uACC4, \uD5A5\uD6C4 \uC5F0\uAD6C" },
-      { id: "build",      label: "Word \uBB38\uC11C \uC0DD\uC131",  detail: "KCI \uC591\uC2DD .docx \uD30C\uC77C \uC0DD\uC131" }
+      { id: "refs",       label: "참고문헌 수집",   detail: "웹 검색으로 30편 이상 학술 문헌 수집" },
+      { id: "design",     label: "연구 설계",       detail: "RQ, 변수 체계, 가설, 이론적 프레임워크" },
+      { id: "intro",      label: "I. 서론 작성",    detail: "연구 배경, 목적, 가설, 범위" },
+      { id: "theory",     label: "II. 이론적 배경", detail: "개념 정의, 이론, 선행연구" },
+      { id: "method",     label: "III. 연구 방법",  detail: "PRISMA, 품질평가, 분석 절차" },
+      { id: "results",    label: "IV. 연구 결과",   detail: "기술통계, 가설검증, 믌감도분석" },
+      { id: "conclusion", label: "V. 결론",         detail: "요약, 시사점, 한계, 향후 연구" },
+      { id: "build",      label: "Word 문서 생성",  detail: "KCI 양식 .docx 파일 생성" }
     ];
 
+    function LoginScreen(props) {
+      var _password = useState(""), password = _password[0], setPassword = _password[1];
+      var _error = useState(""), error = _error[0], setError = _error[1];
+      var _loading = useState(false), loading = _loading[0], setLoading = _loading[1];
+
+      function handleLogin() {
+        if (!password.trim()) {
+          setError("비밀번호를 입력해주세요.");
+          return;
+        }
+
+        setLoading(true);
+        setError("");
+
+        fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password: password })
+        })
+          .then(function(response) {
+            if (!response.ok) {
+              setLoading(false);
+              setError("비밀번호가 윬바르지 않습니다.");
+              return;
+            }
+            response.json().then(function(data) {
+              setLoading(false);
+              if (data.success) {
+                props.onLogin();
+              } else {
+                setError("로그인에 실패했습니다.");
+              }
+            });
+          })
+          .catch(function(err) {
+            console.error("login error:", err);
+            setLoading(false);
+            setError("서버 연결 실패: " + err.message);
+          });
+      }
+
+      function handleKeyDown(ev) {
+        if (ev.key === "Enter") handleLogin();
+      }
+
+      return e("div", { className: "login-screen" },
+        e("div", { className: "login-card" },
+          e("div", { className: "login-icon" }, "🔐"),
+          e("h1", { className: "login-title" }, "KCI Paper Generator"),
+          e("p", { className: "login-subtitle" }, "AI 기반 학술 논문 자동 생성 시스템"),
+          e("div", { className: "login-form-group" },
+            e("label", null, "비밀번호"),
+            e("input", {
+              type: "password",
+              placeholder: "비밀번호를 입력해주세요",
+              value: password,
+              onChange: function(ev) { setPassword(ev.target.value); },
+              onKeyDown: handleKeyDown,
+              disabled: loading
+            })
+          ),
+          e("button", {
+            className: "login-btn",
+            onClick: handleLogin,
+            disabled: loading
+          }, loading ? "로그인 중..." : "로그인"),
+          error ? e("div", { className: "login-error" }, error) : null
+        )
+      );
+    }
+
     function App() {
+      var _authenticated = useState(false), authenticated = _authenticated[0], setAuthenticated = _authenticated[1];
+      var _authLoading = useState(true), authLoading = _authLoading[0], setAuthLoading = _authLoading[1];
       var _page = useState(0), page = _page[0], setPage = _page[1];
       var _topic = useState(""), topic = _topic[0], setTopic = _topic[1];
       var _details = useState(""), details = _details[0], setDetails = _details[1];
@@ -182,8 +304,33 @@
       var logRef = useRef(null);
 
       useEffect(function() {
+        // Check auth on mount
+        fetch("/api/auth-check")
+          .then(function(response) {
+            if (response.ok) {
+              response.json().then(function(data) {
+                setAuthenticated(data.authenticated === true);
+                setAuthLoading(false);
+              });
+            } else {
+              setAuthenticated(false);
+              setAuthLoading(false);
+            }
+          })
+          .catch(function(err) {
+            console.error("auth check error:", err);
+            setAuthenticated(false);
+            setAuthLoading(false);
+          });
+      }, []);
+
+      useEffect(function() {
         if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
       }, [logs]);
+
+      function handleLogin() {
+        setAuthenticated(true);
+      }
 
       function addLog(text, type) {
         setLogs(function(prev) { return prev.concat([{ text: text, type: type || "", time: new Date().toLocaleTimeString() }]); });
@@ -193,11 +340,11 @@
         console.log("handleGenerate called", { topic: topic, apiKey: apiKey ? "set" : "empty" });
 
         if (!topic.trim()) {
-          setError("\uB17C\uBB38 \uC8FC\uC81C\uB97C \uC785\uB825\uD574\uC8FC\uC138\uC694.");
+          setError("논문 주제를 입력해주세요.");
           return;
         }
         if (!apiKey.trim()) {
-          setError("Anthropic API \uD0A4\uB97C \uC0C1\uB2E8 \uC785\uB825\uCC3D\uC5D0 \uC785\uB825\uD574\uC8FC\uC138\uC694. (sk-ant-... \uD615\uC2DD)");
+          setError("Anthropic API 키를 상단 입력창에 입력해주세요. (sk-ant-... 형식)");
           return;
         }
 
@@ -207,14 +354,14 @@
         setLogs([]);
         setLoading(true);
 
-        addLog("\uB17C\uBB38 \uC0DD\uC131\uC744 \uC2DC\uC791\uD569\uB2C8\uB2E4...", "info");
+        addLog("논문 생성을 시작합니다...", "info");
 
         fetch("/api/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ topic: topic, details: details, method: method, pages: pages, theories: theories, apiKey: apiKey })
         }).then(function(response) {
-          if (!response.ok) throw new Error("\uC11C\uBC84 \uC624\uB958: " + response.status);
+          if (!response.ok) throw new Error("서버 오류: " + response.status);
           var reader = response.body.getReader();
           var decoder = new TextDecoder();
           var buffer = "";
@@ -280,6 +427,16 @@
         setPage(0); setCurrentStep(0); setLogs([]); setResult(null); setError(null); setLoading(false);
       }
 
+      if (authLoading) {
+        return e("div", { style: { display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" } },
+          e("p", { style: { color: "var(--text-dim)" } }, "로딩 중...")
+        );
+      }
+
+      if (!authenticated) {
+        return e(LoginScreen, { onLogin: handleLogin });
+      }
+
       var progress = page === 2 ? 100 : Math.round((currentStep / STEPS.length) * 100);
       var hasApiKey = apiKey.length > 5;
 
@@ -290,7 +447,7 @@
       children.push(
         e("div", { className: "header", key: "header" },
           e("h1", null, "KCI Paper Generator"),
-          e("p", null, "AI \uAE30\uBC18 \uD559\uC220 \uB17C\uBB38 \uC790\uB3D9 \uC0DD\uC131 \uC2DC\uC2A4\uD15C")
+          e("p", null, "AI 기반 학술 논문 자동 생성 시스템")
         )
       );
 
@@ -322,10 +479,10 @@
 
         formItems.push(
           e("div", { className: "form-group", key: "fg-topic" },
-            e("label", null, "\uB17C\uBB38 \uC8FC\uC81C *"),
+            e("label", null, "논문 주제 *"),
             e("input", {
               type: "text",
-              placeholder: "\uC608: \uBE14\uB85D\uCCB4\uC778 \uAE30\uC220\uC774 \uACF5\uAE09\uB9DD \uAD00\uB9AC \uC131\uACFC\uC5D0 \uBBF8\uCE58\uB294 \uC601\uD5A5",
+              placeholder: "예: 블록체인 기술이 공급망 관리 성과에 미치는 영향",
               value: topic,
               onChange: function(ev) { setTopic(ev.target.value); }
             })
@@ -334,9 +491,9 @@
 
         formItems.push(
           e("div", { className: "form-group", key: "fg-details" },
-            e("label", null, "\uC138\uBD80 \uC694\uAD6C\uC0AC\uD56D"),
+            e("label", null, "세부 요구사항"),
             e("textarea", {
-              placeholder: "\uD2B9\uC815 \uBCC0\uC218, \uC0B0\uC5C5, \uC9C0\uC5ED \uB4F1 \uC6D0\uD558\uB294 \uC5F0\uAD6C \uBC29\uD5A5\uC744 \uC785\uB825\uD558\uC138\uC694",
+              placeholder: "특정 변수, 산업, 지역 등 원하는 연구 방향을 입력하세요.",
               value: details,
               onChange: function(ev) { setDetails(ev.target.value); }
             })
@@ -352,7 +509,7 @@
         });
         formItems.push(
           e("div", { className: "form-group", key: "fg-method" },
-            e("label", null, "\uC5F0\uAD6C \uBC29\uBC95\uB860"),
+            e("label", null, "연구 방법론"),
             e("div", { className: "chip-group" }, chips)
           )
         );
@@ -360,18 +517,18 @@
         formItems.push(
           e("div", { className: "form-row", key: "fg-row" },
             e("div", { className: "form-group" },
-              e("label", null, "\uB17C\uBB38 \uBD84\uB7C9 (A4 \uD398\uC774\uC9C0)"),
+              e("label", null, "논문 분량 (A4 페이지)"),
               e("select", { value: pages, onChange: function(ev) { setPages(ev.target.value); } },
-                e("option", { value: "10-15" }, "10~15\uD398\uC774\uC9C0"),
-                e("option", { value: "15-20" }, "15~20\uD398\uC774\uC9C0 (\uAE30\uBCF8)"),
-                e("option", { value: "20-30" }, "20~30\uD398\uC774\uC9C0")
+                e("option", { value: "10-15" }, "10~15페이지"),
+                e("option", { value: "15-20" }, "15~20페이지 (기본)"),
+                e("option", { value: "20-30" }, "20~30페이지")
               )
             ),
             e("div", { className: "form-group" },
-              e("label", null, "\uC774\uB860\uC801 \uD504\uB808\uC784\uC6CC\uD06C (\uC120\uD0DD)"),
+              e("label", null, "이론적 프레임워크 (선택)"),
               e("input", {
                 type: "text",
-                placeholder: "\uC608: \uAC70\uB798\uBE44\uC6A9\uC774\uB860, \uC790\uC6D0\uAE30\uBC18\uC774\uB860",
+                placeholder: "예: 거멈비용이론, 자원기반이론",
                 value: theories,
                 onChange: function(ev) { setTheories(ev.target.value); }
               })
@@ -387,7 +544,7 @@
               className: "btn btn-primary",
               onClick: handleGenerate,
               disabled: loading
-            }, loading ? "\uC0DD\uC131 \uC911..." : "\uB17C\uBB38 \uC0DD\uC131 \uC2DC\uC791")
+            }, loading ? "생성 중..." : "논문 생성 시작")
           )
         );
 
@@ -396,7 +553,7 @@
         }
 
         children.push(e("div", { className: "card", key: "input" },
-          e("h2", null, "\uB17C\uBB38 \uC8FC\uC81C \uC124\uC815"),
+          e("h2", null, "논문 주제 설정"),
           formItems
         ));
       }
@@ -425,7 +582,7 @@
         });
 
         var genChildren = [
-          e("h2", { key: "h" }, "\uB17C\uBB38 \uC0DD\uC131 \uC911..."),
+          e("h2", { key: "h" }, "논문 생성 중..."),
           e("ul", { className: "progress-list", key: "pl" }, progItems),
           e("div", { className: "progress-bar-container", key: "pbc" },
             e("div", { className: "progress-bar-fill", style: { width: progress + "%" } })
@@ -438,7 +595,7 @@
           genChildren.push(
             e("div", { key: "ge", style: { marginTop: 16 } },
               e("div", { className: "error-msg" }, error),
-              e("button", { className: "btn btn-secondary", onClick: resetAll, style: { marginTop: 8 } }, "\uB2E4\uC2DC \uC2DC\uB3C4")
+              e("button", { className: "btn btn-secondary", onClick: resetAll, style: { marginTop: 8 } }, "다시 시도")
             )
           );
         }
@@ -450,7 +607,7 @@
       if (page === 2) {
         var doneChildren = [
           e("div", { className: "result-icon", key: "ri" }, "\u2713"),
-          e("h2", { key: "rh" }, "\uB17C\uBB38 \uC0DD\uC131 \uC644\uB8CC"),
+          e("h2", { key: "rh" }, "논문 생성 완료"),
           e("p", { style: { color: "var(--text-dim)" }, key: "rt" }, topic)
         ];
 
@@ -459,15 +616,15 @@
             e("div", { className: "result-stats", key: "rs" },
               e("div", { className: "stat" },
                 e("div", { className: "stat-value" }, result.sections || 5),
-                e("div", { className: "stat-label" }, "\uC139\uC158")
+                e("div", { className: "stat-label" }, "섹션")
               ),
               e("div", { className: "stat" },
                 e("div", { className: "stat-value" }, (result.references || 30) + "+"),
-                e("div", { className: "stat-label" }, "\uCC38\uACE0\uBB38\uD5CC")
+                e("div", { className: "stat-label" }, "참고문허")
               ),
               e("div", { className: "stat" },
                 e("div", { className: "stat-value" }, result.hypotheses || 5),
-                e("div", { className: "stat-label" }, "\uC5F0\uAD6C\uAC00\uC124")
+                e("div", { className: "stat-label" }, "연구 가설")
               )
             )
           );
@@ -475,8 +632,8 @@
 
         doneChildren.push(
           e("div", { style: { display: "flex", gap: 12, justifyContent: "center", marginTop: 24 }, key: "rb" },
-            e("button", { className: "btn btn-primary", onClick: handleDownload }, ".docx \uB2E4\uC6B4\uB85C\uB4DC"),
-            e("button", { className: "btn btn-secondary", onClick: resetAll }, "\uC0C8 \uB17C\uBB38 \uC0DD\uC131")
+            e("button", { className: "btn btn-primary", onClick: handleDownload }, ".docx 다운로드"),
+            e("button", { className: "btn btn-secondary", onClick: resetAll }, "새 논문 생성")
           )
         );
 
@@ -494,6 +651,11 @@
     }
 
     ReactDOM.createRoot(document.getElementById("root")).render(e(App));
+
+    // Service Worker Registration
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js');
+    }
   </script>
 </body>
 </html>
