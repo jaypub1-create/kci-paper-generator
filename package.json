@@ -1,0 +1,18 @@
+{
+  "name": "kci-paper-generator",
+  "version": "1.0.0",
+  "description": "KCI 스타일 학술 논문 자동 생성 웹 앱",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "docx": "^9.1.1",
+    "express": "^4.21.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
