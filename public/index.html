@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KCI Paper Generator</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface2: #334155;
+      --border: #475569;
+      --text: #f1f5f9;
+      --text-dim: #94a3b8;
+      --accent: #6366f1;
+      --accent-light: #818cf8;
+      --success: #22c55e;
+      --warn: #f59e0b;
+      --error: #ef4444;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif;
+      background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6;
+    }
+    .app { max-width: 860px; margin: 0 auto; padding: 20px; }
+    .header { text-align: center; padding: 40px 0 30px; }
+    .header h1 {
+      font-size: 28px; font-weight: 700;
+      background: linear-gradient(135deg, var(--accent-light), #a78bfa);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px;
+    }
+    .header p { color: var(--text-dim); font-size: 14px; }
+    .steps-bar { display: flex; justify-content: center; gap: 8px; margin-bottom: 36px; }
+    .step-dot {
+      width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 600;
+      background: var(--surface); border: 2px solid var(--border); color: var(--text-dim); transition: all 0.3s;
+    }
+    .step-dot.active { background: var(--accent); border-color: var(--accent-light); color: white; box-shadow: 0 0 16px rgba(99,102,241,0.4); }
+    .step-dot.done { background: var(--success); border-color: var(--success); color: white; }
+    .step-line { width: 40px; height: 2px; background: var(--border); align-self: center; }
+    .step-line.done { background: var(--success); }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 32px; margin-bottom: 20px; }
+    .card h2 { font-size: 18px; margin-bottom: 20px; color: var(--accent-light); }
+    .form-group { margin-bottom: 20px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--text-dim); margin-bottom: 6px; letter-spacing: 0.5px; }
+    .form-group input, .form-group textarea, .form-group select {
+      width: 100%; padding: 12px 16px; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 10px;
+      color: var(--text); font-size: 15px; font-family: inherit; outline: none;
+    }
+    .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: var(--accent); }
+    .form-group textarea { resize: vertical; min-height: 80px; }
+    .form-group select option { background: var(--bg); }
+    .form-row { display: flex; gap: 16px; }
+    .form-row .form-group { flex: 1; }
+    .chip-group { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      padding: 8px 16px; border-radius: 20px; font-size: 13px; cursor: pointer;
+      border: 1px solid var(--border); background: var(--bg); color: var(--text-dim); transition: all 0.2s;
+    }
+    .chip:hover { border-color: var(--accent); color: var(--text); }
+    .chip.selected { background: var(--accent); border-color: var(--accent); color: white; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 14px 28px; border-radius: 12px; font-size: 15px; font-weight: 600;
+      cursor: pointer; border: none; font-family: inherit;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #7c3aed); color: white;
+      box-shadow: 0 4px 12px rgba(99,102,241,0.3);
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(99,102,241,0.4); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-row { display: flex; justify-content: space-between; margin-top: 28px; }
+    .error-msg { color: var(--error); margin-top: 12px; font-size: 14px; padding: 10px; background: rgba(239,68,68,0.1); border-radius: 8px; }
+    .progress-list { list-style: none; }
+    .progress-item { display: flex; align-items: flex-start; gap: 14px; padding: 14px 0; border-bottom: 1px solid rgba(71,85,105,0.3); }
+    .progress-item:last-child { border-bottom: none; }
+    .progress-icon {
+      width: 28px; height: 28px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; flex-shrink: 0; margin-top: 2px;
+    }
+    .progress-icon.waiting { background: var(--surface2); color: var(--text-dim); }
+    .progress-icon.running { background: var(--accent); color: white; animation: pulse 1.5s infinite; }
+    .progress-icon.done { background: var(--success); color: white; }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(99,102,241,0.4); }
+      50% { box-shadow: 0 0 0 8px rgba(99,102,241,0); }
+    }
+    .progress-text h4 { font-size: 14px; font-weight: 600; }
+    .progress-text p { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+    .progress-bar-container { margin-top: 24px; background: var(--bg); border-radius: 8px; height: 8px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #a78bfa); border-radius: 8px; transition: width 0.5s ease; }
+    .progress-percent { text-align: right; font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+    .result-card { text-align: center; padding: 48px 32px; }
+    .result-icon {
+      width: 72px; height: 72px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--success), #16a34a);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px; font-size: 32px;
+    }
+    .result-card h2 { color: var(--text); font-size: 22px; margin-bottom: 10px; }
+    .result-stats { display: flex; justify-content: center; gap: 24px; margin: 24px 0; }
+    .stat { text-align: center; }
+    .stat-value { font-size: 28px; font-weight: 700; color: var(--accent-light); }
+    .stat-label { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+    .api-key-bar {
+      display: flex; gap: 8px; align-items: center;
+      padding: 12px 16px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 12px; margin-bottom: 24px;
+    }
+    .api-key-bar input { flex: 1; background: none; border: none; color: var(--text); font-size: 13px; font-family: monospace; outline: none; }
+    .api-key-bar .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .api-key-bar .dot-off { background: var(--error); }
+    .api-key-bar .dot-on { background: var(--success); }
+    .log-area {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+      padding: 16px; max-height: 200px; overflow-y: auto; margin-top: 16px;
+      font-family: 'Consolas', monospace; font-size: 12px; color: var(--text-dim); line-height: 1.8;
+    }
+    .log-line { white-space: pre-wrap; }
+    .log-info { color: var(--accent-light); }
+    .log-success { color: var(--success); }
+    .log-error { color: var(--error); }
+    @media (max-width: 640px) {
+      .app { padding: 12px; } .card { padding: 20px; }
+      .header h1 { font-size: 22px; }
+      .form-row { flex-direction: column; gap: 0; }
+      .result-stats { flex-direction: column; gap: 12px; }
+      .btn-row { flex-direction: column; gap: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+
+  <script>
+    // ====== Pure JS (no Babel/JSX needed) ======
+    var e = React.createElement;
+    var useState = React.useState;
+    var useEffect = React.useEffect;
+    var useRef = React.useRef;
+
+    var METHODS = [
+      { id: "slr_meta", label: "SLR + \uBA54\uD0C0\uBD84\uC11D" },
+      { id: "empirical", label: "\uC2E4\uC99D\uC5F0\uAD6C" },
+      { id: "case", label: "\uC0AC\uB840\uC5F0\uAD6C" },
+      { id: "experiment", label: "\uC2E4\uD5D8\uC5F0\uAD6C" }
+    ];
+
+    var STEPS = [
+      { id: "refs",       label: "\uCC38\uACE0\uBB38\uD5CC \uC218\uC9D1",   detail: "\uC6F9 \uAC80\uC0C9\uC73C\uB85C 30\uD3B8 \uC774\uC0C1 \uD559\uC220 \uBB38\uD5CC \uC218\uC9D1" },
+      { id: "design",     label: "\uC5F0\uAD6C \uC124\uACC4",       detail: "RQ, \uBCC0\uC218 \uCCB4\uACC4, \uAC00\uC124, \uC774\uB860\uC801 \uD504\uB808\uC784\uC6CC\uD06C" },
+      { id: "intro",      label: "I. \uC11C\uB860 \uC791\uC131",    detail: "\uC5F0\uAD6C \uBC30\uACBD, \uBAA9\uC801, \uAC00\uC124, \uBC94\uC704" },
+      { id: "theory",     label: "II. \uC774\uB860\uC801 \uBC30\uACBD", detail: "\uAC1C\uB150 \uC815\uC758, \uC774\uB860, \uC120\uD589\uC5F0\uAD6C" },
+      { id: "method",     label: "III. \uC5F0\uAD6C \uBC29\uBC95",  detail: "PRISMA, \uD488\uC9C8\uD3C9\uAC00, \uBD84\uC11D \uC808\uCC28" },
+      { id: "results",    label: "IV. \uC5F0\uAD6C \uACB0\uACFC",   detail: "\uAE30\uC220\uD1B5\uACC4, \uAC00\uC124\uAC80\uC99D, \uBBFC\uAC10\uB3C4\uBD84\uC11D" },
+      { id: "conclusion", label: "V. \uACB0\uB860",         detail: "\uC694\uC57D, \uC2DC\uC0AC\uC810, \uD55C\uACC4, \uD5A5\uD6C4 \uC5F0\uAD6C" },
+      { id: "build",      label: "Word \uBB38\uC11C \uC0DD\uC131",  detail: "KCI \uC591\uC2DD .docx \uD30C\uC77C \uC0DD\uC131" }
+    ];
+
+    function App() {
+      var _page = useState(0), page = _page[0], setPage = _page[1];
+      var _topic = useState(""), topic = _topic[0], setTopic = _topic[1];
+      var _details = useState(""), details = _details[0], setDetails = _details[1];
+      var _method = useState("slr_meta"), method = _method[0], setMethod = _method[1];
+      var _pages = useState("15-20"), pages = _pages[0], setPages = _pages[1];
+      var _theories = useState(""), theories = _theories[0], setTheories = _theories[1];
+      var _apiKey = useState(""), apiKey = _apiKey[0], setApiKey = _apiKey[1];
+      var _curStep = useState(0), currentStep = _curStep[0], setCurrentStep = _curStep[1];
+      var _logs = useState([]), logs = _logs[0], setLogs = _logs[1];
+      var _result = useState(null), result = _result[0], setResult = _result[1];
+      var _error = useState(null), error = _error[0], setError = _error[1];
+      var _loading = useState(false), loading = _loading[0], setLoading = _loading[1];
+      var logRef = useRef(null);
+
+      useEffect(function() {
+        if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+      }, [logs]);
+
+      function addLog(text, type) {
+        setLogs(function(prev) { return prev.concat([{ text: text, type: type || "", time: new Date().toLocaleTimeString() }]); });
+      }
+
+      function handleGenerate() {
+        console.log("handleGenerate called", { topic: topic, apiKey: apiKey ? "set" : "empty" });
+
+        if (!topic.trim()) {
+          setError("\uB17C\uBB38 \uC8FC\uC81C\uB97C \uC785\uB825\uD574\uC8FC\uC138\uC694.");
+          return;
+        }
+        if (!apiKey.trim()) {
+          setError("Anthropic API \uD0A4\uB97C \uC0C1\uB2E8 \uC785\uB825\uCC3D\uC5D0 \uC785\uB825\uD574\uC8FC\uC138\uC694. (sk-ant-... \uD615\uC2DD)");
+          return;
+        }
+
+        setError(null);
+        setPage(1);
+        setCurrentStep(0);
+        setLogs([]);
+        setLoading(true);
+
+        addLog("\uB17C\uBB38 \uC0DD\uC131\uC744 \uC2DC\uC791\uD569\uB2C8\uB2E4...", "info");
+
+        fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ topic: topic, details: details, method: method, pages: pages, theories: theories, apiKey: apiKey })
+        }).then(function(response) {
+          if (!response.ok) throw new Error("\uC11C\uBC84 \uC624\uB958: " + response.status);
+          var reader = response.body.getReader();
+          var decoder = new TextDecoder();
+          var buffer = "";
+
+          function processStream() {
+            return reader.read().then(function(chunk) {
+              if (chunk.done) {
+                setLoading(false);
+                // 스트림 끝났는데 결과가 없으면 에러
+                addLog("스트림 종료", "info");
+                return;
+              }
+              buffer += decoder.decode(chunk.value, { stream: true });
+              var lines = buffer.split("\n");
+              buffer = lines.pop();
+              lines.forEach(function(line) {
+                if (!line.trim()) return;
+                try {
+                  var msg = JSON.parse(line);
+                  if (msg.type === "step") {
+                    setCurrentStep(msg.step);
+                    addLog(msg.message, "info");
+                  } else if (msg.type === "log") {
+                    addLog(msg.message, "");
+                  } else if (msg.type === "done") {
+                    setResult(msg.result);
+                    setPage(2);
+                    setLoading(false);
+                    addLog("논문 생성 완료!", "success");
+                  } else if (msg.type === "error") {
+                    setError(msg.message);
+                    setLoading(false);
+                    addLog("오류: " + msg.message, "error");
+                  }
+                } catch(ex) {
+                  console.log("parse skip:", line);
+                }
+              });
+              return processStream();
+            }).catch(function(streamErr) {
+              console.error("stream error:", streamErr);
+              setError("스트림 읽기 오류: " + streamErr.message);
+              setLoading(false);
+              addLog("스트림 오류: " + streamErr.message, "error");
+            });
+          }
+          return processStream();
+        }).catch(function(err) {
+          console.error("fetch error:", err);
+          setError("서버 연결 실패: " + err.message);
+          setLoading(false);
+          addLog("오류: " + err.message, "error");
+        });
+      }
+
+      function handleDownload() {
+        if (result && result.filename) {
+          window.location.href = "/api/download/" + result.filename;
+        }
+      }
+
+      function resetAll() {
+        setPage(0); setCurrentStep(0); setLogs([]); setResult(null); setError(null); setLoading(false);
+      }
+
+      var progress = page === 2 ? 100 : Math.round((currentStep / STEPS.length) * 100);
+      var hasApiKey = apiKey.length > 5;
+
+      // ── Render ──
+      var children = [];
+
+      // Header
+      children.push(
+        e("div", { className: "header", key: "header" },
+          e("h1", null, "KCI Paper Generator"),
+          e("p", null, "AI \uAE30\uBC18 \uD559\uC220 \uB17C\uBB38 \uC790\uB3D9 \uC0DD\uC131 \uC2DC\uC2A4\uD15C")
+        )
+      );
+
+      // Steps bar
+      var stepDots = [];
+      for (var si = 0; si < 3; si++) {
+        if (si > 0) stepDots.push(e("div", { className: "step-line" + (page > si - 1 ? " done" : ""), key: "line" + si }));
+        var cls = "step-dot" + (page === si ? " active" : page > si ? " done" : "");
+        stepDots.push(e("div", { className: cls, key: "dot" + si }, page > si ? "\u2713" : String(si + 1)));
+      }
+      children.push(e("div", { className: "steps-bar", key: "steps" }, stepDots));
+
+      // API Key bar
+      children.push(
+        e("div", { className: "api-key-bar", key: "apikey" },
+          e("div", { className: "dot " + (hasApiKey ? "dot-on" : "dot-off") }),
+          e("input", {
+            type: "password",
+            placeholder: "Anthropic API Key (sk-ant-...)",
+            value: apiKey,
+            onChange: function(ev) { setApiKey(ev.target.value); }
+          })
+        )
+      );
+
+      // ── Page 0: Input ──
+      if (page === 0) {
+        var formItems = [];
+
+        formItems.push(
+          e("div", { className: "form-group", key: "fg-topic" },
+            e("label", null, "\uB17C\uBB38 \uC8FC\uC81C *"),
+            e("input", {
+              type: "text",
+              placeholder: "\uC608: \uBE14\uB85D\uCCB4\uC778 \uAE30\uC220\uC774 \uACF5\uAE09\uB9DD \uAD00\uB9AC \uC131\uACFC\uC5D0 \uBBF8\uCE58\uB294 \uC601\uD5A5",
+              value: topic,
+              onChange: function(ev) { setTopic(ev.target.value); }
+            })
+          )
+        );
+
+        formItems.push(
+          e("div", { className: "form-group", key: "fg-details" },
+            e("label", null, "\uC138\uBD80 \uC694\uAD6C\uC0AC\uD56D"),
+            e("textarea", {
+              placeholder: "\uD2B9\uC815 \uBCC0\uC218, \uC0B0\uC5C5, \uC9C0\uC5ED \uB4F1 \uC6D0\uD558\uB294 \uC5F0\uAD6C \uBC29\uD5A5\uC744 \uC785\uB825\uD558\uC138\uC694",
+              value: details,
+              onChange: function(ev) { setDetails(ev.target.value); }
+            })
+          )
+        );
+
+        var chips = METHODS.map(function(m) {
+          return e("div", {
+            key: m.id,
+            className: "chip" + (method === m.id ? " selected" : ""),
+            onClick: function() { setMethod(m.id); }
+          }, m.label);
+        });
+        formItems.push(
+          e("div", { className: "form-group", key: "fg-method" },
+            e("label", null, "\uC5F0\uAD6C \uBC29\uBC95\uB860"),
+            e("div", { className: "chip-group" }, chips)
+          )
+        );
+
+        formItems.push(
+          e("div", { className: "form-row", key: "fg-row" },
+            e("div", { className: "form-group" },
+              e("label", null, "\uB17C\uBB38 \uBD84\uB7C9 (A4 \uD398\uC774\uC9C0)"),
+              e("select", { value: pages, onChange: function(ev) { setPages(ev.target.value); } },
+                e("option", { value: "10-15" }, "10~15\uD398\uC774\uC9C0"),
+                e("option", { value: "15-20" }, "15~20\uD398\uC774\uC9C0 (\uAE30\uBCF8)"),
+                e("option", { value: "20-30" }, "20~30\uD398\uC774\uC9C0")
+              )
+            ),
+            e("div", { className: "form-group" },
+              e("label", null, "\uC774\uB860\uC801 \uD504\uB808\uC784\uC6CC\uD06C (\uC120\uD0DD)"),
+              e("input", {
+                type: "text",
+                placeholder: "\uC608: \uAC70\uB798\uBE44\uC6A9\uC774\uB860, \uC790\uC6D0\uAE30\uBC18\uC774\uB860",
+                value: theories,
+                onChange: function(ev) { setTheories(ev.target.value); }
+              })
+            )
+          )
+        );
+
+        // Generate button - always enabled, validates on click
+        formItems.push(
+          e("div", { className: "btn-row", key: "fg-btn" },
+            e("div"),
+            e("button", {
+              className: "btn btn-primary",
+              onClick: handleGenerate,
+              disabled: loading
+            }, loading ? "\uC0DD\uC131 \uC911..." : "\uB17C\uBB38 \uC0DD\uC131 \uC2DC\uC791")
+          )
+        );
+
+        if (error) {
+          formItems.push(e("div", { className: "error-msg", key: "err" }, error));
+        }
+
+        children.push(e("div", { className: "card", key: "input" },
+          e("h2", null, "\uB17C\uBB38 \uC8FC\uC81C \uC124\uC815"),
+          formItems
+        ));
+      }
+
+      // ── Page 1: Generating ──
+      if (page === 1) {
+        var progItems = STEPS.map(function(step, i) {
+          var status = i < currentStep ? "done" : i === currentStep ? "running" : "waiting";
+          return e("li", { className: "progress-item", key: step.id },
+            e("div", { className: "progress-icon " + status },
+              status === "done" ? "\u2713" : status === "running" ? "\u25B6" : String(i + 1)
+            ),
+            e("div", { className: "progress-text" },
+              e("h4", null, step.label),
+              e("p", null, step.detail)
+            )
+          );
+        });
+
+        var logItems = logs.map(function(log, i) {
+          var logCls = "log-line" + (log.type ? " log-" + log.type : "");
+          return e("div", { key: i, className: logCls },
+            e("span", { style: { color: "var(--text-dim)" } }, "[" + log.time + "] "),
+            log.text
+          );
+        });
+
+        var genChildren = [
+          e("h2", { key: "h" }, "\uB17C\uBB38 \uC0DD\uC131 \uC911..."),
+          e("ul", { className: "progress-list", key: "pl" }, progItems),
+          e("div", { className: "progress-bar-container", key: "pbc" },
+            e("div", { className: "progress-bar-fill", style: { width: progress + "%" } })
+          ),
+          e("div", { className: "progress-percent", key: "pp" }, progress + "%"),
+          e("div", { className: "log-area", ref: logRef, key: "la" }, logItems)
+        ];
+
+        if (error) {
+          genChildren.push(
+            e("div", { key: "ge", style: { marginTop: 16 } },
+              e("div", { className: "error-msg" }, error),
+              e("button", { className: "btn btn-secondary", onClick: resetAll, style: { marginTop: 8 } }, "\uB2E4\uC2DC \uC2DC\uB3C4")
+            )
+          );
+        }
+
+        children.push(e("div", { className: "card", key: "gen" }, genChildren));
+      }
+
+      // ── Page 2: Done ──
+      if (page === 2) {
+        var doneChildren = [
+          e("div", { className: "result-icon", key: "ri" }, "\u2713"),
+          e("h2", { key: "rh" }, "\uB17C\uBB38 \uC0DD\uC131 \uC644\uB8CC"),
+          e("p", { style: { color: "var(--text-dim)" }, key: "rt" }, topic)
+        ];
+
+        if (result) {
+          doneChildren.push(
+            e("div", { className: "result-stats", key: "rs" },
+              e("div", { className: "stat" },
+                e("div", { className: "stat-value" }, result.sections || 5),
+                e("div", { className: "stat-label" }, "\uC139\uC158")
+              ),
+              e("div", { className: "stat" },
+                e("div", { className: "stat-value" }, (result.references || 30) + "+"),
+                e("div", { className: "stat-label" }, "\uCC38\uACE0\uBB38\uD5CC")
+              ),
+              e("div", { className: "stat" },
+                e("div", { className: "stat-value" }, result.hypotheses || 5),
+                e("div", { className: "stat-label" }, "\uC5F0\uAD6C\uAC00\uC124")
+              )
+            )
+          );
+        }
+
+        doneChildren.push(
+          e("div", { style: { display: "flex", gap: 12, justifyContent: "center", marginTop: 24 }, key: "rb" },
+            e("button", { className: "btn btn-primary", onClick: handleDownload }, ".docx \uB2E4\uC6B4\uB85C\uB4DC"),
+            e("button", { className: "btn btn-secondary", onClick: resetAll }, "\uC0C8 \uB17C\uBB38 \uC0DD\uC131")
+          )
+        );
+
+        children.push(e("div", { className: "card result-card", key: "done" }, doneChildren));
+      }
+
+      // Footer
+      children.push(
+        e("p", { style: { textAlign: "center", color: "var(--text-dim)", fontSize: 11, marginTop: 24 }, key: "footer" },
+          "Powered by Claude API + KCI Paper Generator"
+        )
+      );
+
+      return e("div", { className: "app" }, children);
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(e(App));
+  </script>
+</body>
+</html>
