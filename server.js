@@ -8,6 +8,7 @@ const express = require("express");
 const path = require("path");
 const fs = require("fs");
 const { execSync } = require("child_process");
+const crypto = require("crypto");
 
 // ── Anthropic SDK 로드 (여러 import 패턴 대응) ──
 let AnthropicClass;
@@ -24,11 +25,85 @@ try {
 const app = express();
 const PORT = process.env.PORT || 3000;
 const OUTPUT_DIR = path.join(__dirname, "output");
+const APP_PASSWORD = process.env.APP_PASSWORD || "kci2024!";
 
 if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.static(path.join(__dirname, "public")));
+
+// ── 인증 토큰 저장소 (실제 배포에서는 Redis 등 사용) ──
+const authTokens = new Set();
+
+// ── 헬퍼: 랜덤 토큰 생성 ──
+function generateToken() {
+  return crypto.randomBytes(32).toString("hex");
+}
+
+// ── 인증 미들웨어 ──
+function authMiddleware(req, res, next) {
+  // 인증이 필요하지 않은 경로들
+  const publicPaths = ["/api/login", "/api/auth-check", "/api/health"];
+  const isPublicPath = publicPaths.some((p) => req.path === p);
+  const isStaticAsset = req.path.startsWith("/") && /\.(js|css|json|svg|png|jpg|jpeg|gif|woff|woff2|ttf|eot)$/i.test(req.path);
+
+  if (isPublicPath || isStaticAsset) {
+    return next();
+  }
+
+  // 기타 경로는 인증 필욘
+  const token = req.cookies?.auth_token;
+  if (!token || !authTokens.has(token)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  next();
+}
+
+// ── 쿠키 파서 (간단한 구현) ──
+app.use((req, res, next) => {
+  const cookieHeader = req.headers.cookie || "";
+  req.cookies = {};
+  cookieHeader.split(";").forEach((cookie) => {
+    const [name, value] = cookie.trim().split("=");
+    if (name && value) {
+      req.cookies[name] = decodeURIComponent(value);
+    }
+  });
+  next();
+});
+
+// ── 로그인 API ──
+app.post("/api/login", express.json(), (req, res) => {
+  const { password } = req.body;
+
+  if (!password) {
+    return res.status(400).json({ error: "Password is required" });
+  }
+
+  if (password !== APP_PASSWORD) {
+    return res.status(401).json({ error: "Invalid password" });
+  }
+
+  const token = generateToken();
+  authTokens.add(token);
+
+  // Set secure cookie (HttpOnly, SameSite)
+  res.setHeader("Set-Cookie", `auth_token=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800`);
+
+  res.json({ success: true });
+});
+
+// ── 인증 체크 API ──
+app.get("/api/auth-check", (req, res) => {
+  const token = req.cookies?.auth_token;
+  const isAuthenticated = token && authTokens.has(token);
+
+  res.json({ authenticated: isAuthenticated });
+});
+
+// ── 인증 미들웨어 적용 ──
+app.use(authMiddleware);
 
 // ── 헬스체크 ──
 app.get("/api/health", (req, res) => {
@@ -45,7 +120,7 @@ function buildPrompt(params) {
     experiment: "실험연구",
   };
 
-  return `당신은 한국 학술논문 전문 작성자입니다. 아래 주제에 대한 KCI 등재지 수준의 한글 학술 논문을 JSON 형식으로 작성해주세요.
+  return `당신은 한국 학술논문 전문 작섰자입니다. 아래 주제에 대한 KCI 듰재지 수준의 한글 학술 논문을 JSON 형식으로 작성해주세요.
 
 ## 논문 주제
 ${topic}
@@ -76,7 +151,7 @@ ${theories || "주제에 적합한 이론 2개를 선택하여 적용"}
 - **I. 서론** (4개 절): 연구 배경(research gap 3개), 연구 목적/RQ, 연구 모형/가설, 연구 범위
 - **II. 이론적 배경** (4개 절): 핵심 개념, 종속변수 측정, 이론적 프레임워크, 선행연구 검토
 - **III. 연구 방법** (6~7개 절): 연구 설계, 문헌 탐색, PRISMA, 품질 평가, 데이터 추출, 메타분석 절차
-- **IV. 연구 결과** (5~6개 절): 기술통계, 가설 검증(k/N/r/CI/p/I²), 출판 편향, 조절효과, 결과 종합
+- **IV. 연구 결과** (5~6개 절): 기술통계, 가설 검증(k/N/r/CI/p/I²), 추판 편향, 조절효과, 결과 종합
 - **V. 결론 및 논의** (4개 절): 요약, 학술적 시사점, 실무적 시사점, 한계 및 향후 연구
 
 ### 3. 참고문헌
@@ -84,7 +159,7 @@ ${theories || "주제에 적합한 이론 2개를 선택하여 적용"}
 - 국내: "홍길동 (2023). 제목. 학술지명, 29(3), 1-25."
 - 해외: APA 7th "Smith, J. (2023). Title. Journal, 45(2), 112-135."
 
-## 출력: 아래 JSON 구조로만 출력. JSON 외 다른 텍스트 없이.
+## 출력: 아래 JSON 구조로만 출력하세요. JSON 외 다른 텍스트 없이.
 
 \`\`\`json
 {
@@ -103,7 +178,7 @@ ${theories || "주제에 적합한 이론 2개를 선택하여 적용"}
       "number": "I",
       "title": "서론",
       "subsections": [
-        { "number": "1", "title": "연구 배경 및 필요성", "content": "단락구분은 빈줄 두개(\\n\\n)로..." }
+        { "number": "1", "title": "연구 배경 및 필요성", "content": "단락구분은 비줄 두개(\\n\\n)로..." }
       ]
     }
   ],
@@ -115,9 +190,9 @@ ${theories || "주제에 적합한 이론 2개를 선택하여 적용"}
 \`\`\`
 
 ## 매우 중요한 JSON 규칙
-1. 문자열 값 안에 큰따옴표(")를 쓰지 마세요. 작은따옴표(')나 홑따옴표로 대체하세요.
+1. 문자열 값 안에 큰따옴표(")를 쓰지 마세요. 작은따옴표(')나 홐땨툴표로 대체하세요.
 2. 문자열 값 안에 실제 줄바꿈을 넣지 마세요. 단락 구분은 반드시 \\n\\n 텍스트로 넣으세요.
-3. 참고문헌의 formatted 필드에 논문 제목을 따옴표로 감싸지 마세요.
+3. 참고문헌의 formatted 필드에 논문 제목을 따옴표로 감슸지 마세요.
 4. 반드시 유효한 JSON만 출력하세요. JSON 외 다른 텍스트 없이.`;
 }
 
@@ -156,7 +231,7 @@ function repairJSON(str) {
   s = s.replace(/,\s*\{[^}]*$/g, "");
   s = s.replace(/,\s*"[^"]*$/g, "");
 
-  // 4) 열린 문자열 닫기 & 괄호 세기
+  // 4) 열린 문자열 닫기 & 관호 세기
   let braces = 0, brackets = 0;
   inStr = false; esc = false;
   for (let i = 0; i < s.length; i++) {
@@ -301,7 +376,7 @@ app.post("/api/generate", async (req, res) => {
       } catch (apiErr) {
         console.error("[API] 모델 " + modelName + " 실패:", apiErr.message);
         if (apiErr.message.includes("401") || apiErr.status === 401) {
-          send({ type: "error", message: "API 키가 유효하지 않습니다. 올바른 Anthropic API 키를 입력해주세요." });
+          send({ type: "error", message: "API 키가 유효하지 않습니다. 윬바른 Anthropic API 키를 입력해주세요." });
           return res.end();
         }
         if (apiErr.message.includes("429") || apiErr.status === 429) {
@@ -309,7 +384,7 @@ app.post("/api/generate", async (req, res) => {
           return res.end();
         }
         if (apiErr.message.includes("credit") || apiErr.message.includes("insufficient") || apiErr.message.includes("billing")) {
-          send({ type: "error", message: "API 크레딧이 부족합니다. console.anthropic.com에서 확인해주세요." });
+          send({ type: "error", message: "API 크레랧이 부족합니다. console.anthropic.com에서 확인해주세요." });
           return res.end();
         }
         // 모델을 못찾은 경우 다음 모델 시도
@@ -426,6 +501,15 @@ app.get("/api/download/:filename", (req, res) => {
   res.download(filepath);
 });
 
+// ── PWA 지원: manifest.json과 service-worker.js 제공 ──
+app.get("/manifest.json", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "manifest.json"));
+});
+
+app.get("/service-worker.js", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "service-worker.js"));
+});
+
 // SPA fallback
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
@@ -437,7 +521,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log("");
   console.log("  ┌──────────────────────────────────┐");
   console.log("  │  KCI Paper Generator Server       │");
